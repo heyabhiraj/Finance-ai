@@ -1,23 +1,25 @@
 ---
 import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
-import BudgetOptimizer from '../components/BudgetOptimizer';
+import Dashboard from '../components/Dashboard';
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
     <BaseHead
-      title="Smart Finance Optimizer"
-      description="OR-powered savings planner with AI financial strategist. Upload your statement, set a savings goal, and get data-driven recommendations."
+      title="Financial Dashboard"
+      description="Personal finance dashboard with KPIs, charts, and spending insights."
     />
+    <style>
+      body { margin: 0; padding: 0; background: #0f172a; }
+      main { width: 100%; max-width: 100%; margin: 0; padding: 0; }
+    </style>
   </head>
   <body>
     <Header />
     <main>
-      <BudgetOptimizer client:load />
+      <Dashboard client:load />
     </main>
-    <Footer />
   </body>
 </html>
