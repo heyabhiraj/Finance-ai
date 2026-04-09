@@ -1003,8 +1003,8 @@ export default function BudgetOptimizer() {
                         savings goal requires approximately ₹
                         {Math.ceil(
                           (1000 /
-                            (budgetPlan.variableExpenses +
-                              budgetPlan.luxuryExpenses || 1)) *
+                            ((budgetPlan.variableExpenses +
+                              budgetPlan.luxuryExpenses) || 1)) *
                             100
                         )}
                         % more cuts from your flexible spending.
@@ -1094,7 +1094,7 @@ export default function BudgetOptimizer() {
                           </span>
                         </td>
                         <td className="px-5 py-3 font-medium text-gray-800">
-                          ₹{t.amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                          ₹{t.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                       </tr>
                     ))}
