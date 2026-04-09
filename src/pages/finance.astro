@@ -1,0 +1,23 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import FinanceDashboard from '../components/FinanceDashboard';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead
+      title="Personal Finance Assistant"
+      description="Track your spending, visualise budgets, and get AI-powered financial insights."
+    />
+  </head>
+  <body>
+    <Header />
+    <main>
+      <FinanceDashboard client:load />
+    </main>
+    <Footer />
+  </body>
+</html>

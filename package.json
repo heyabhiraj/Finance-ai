@@ -14,12 +14,23 @@
 	"dependencies": {
 		"@astrojs/cloudflare": "12.6.12",
 		"@astrojs/mdx": "4.3.13",
+		"@astrojs/react": "^5.0.3",
 		"@astrojs/rss": "4.0.14",
 		"@astrojs/sitemap": "3.6.1",
+		"@astrojs/tailwind": "^6.0.2",
+		"@google/generative-ai": "^0.24.1",
 		"astro": "5.16.9",
-		"typescript": "5.9.3"
+		"lucide-react": "^1.8.0",
+		"react": "^19.2.5",
+		"react-dom": "^19.2.5",
+		"recharts": "^3.8.1",
+		"tailwindcss": "^3.4.19",
+		"typescript": "5.9.3",
+		"xlsx": "^0.18.5"
 	},
 	"devDependencies": {
+		"@types/react": "^19.2.14",
+		"@types/react-dom": "^19.2.3",
 		"wrangler": "4.56.0"
 	},
 	"engines": {
