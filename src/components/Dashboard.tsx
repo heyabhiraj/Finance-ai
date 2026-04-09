@@ -34,6 +34,9 @@ const EMPTY_FORM: Omit<Entry, "id"> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const MS_PER_DAY = 86_400_000;
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
@@ -175,7 +178,7 @@ function computeStats(entries: Entry[]): Stats {
     }
 
     // Weekly count for last 7 days
-    const diff = Math.floor((now.getTime() - new Date(e.date).getTime()) / 86400000);
+    const diff = Math.floor((now.getTime() - new Date(e.date).getTime()) / MS_PER_DAY);
     if (diff >= 0 && diff < 7) {
       const dayOfWeek = new Date(e.date).getDay(); // 0=Sun
       const idx = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Mon=0..Sun=6
@@ -231,32 +234,32 @@ function EntryForm({ initial, onSave, onCancel }: EntryFormProps) {
     <form onSubmit={handleSubmit} className="ef-form">
       {error && <div className="ef-error">{error}</div>}
       <div className="ef-row">
-        <label className="ef-label">Date
-          <input className="ef-input" type="date" value={form.date}
+        <label htmlFor="ef-date" className="ef-label">Date
+          <input id="ef-date" className="ef-input" type="date" value={form.date}
             onChange={(e) => set("date", e.target.value)} required />
         </label>
-        <label className="ef-label">Type
-          <select className="ef-input" value={form.type}
+        <label htmlFor="ef-type" className="ef-label">Type
+          <select id="ef-type" className="ef-input" value={form.type}
             onChange={(e) => set("type", e.target.value as "credit" | "debit")}>
             <option value="credit">Credit (Income)</option>
             <option value="debit">Debit (Expense)</option>
           </select>
         </label>
-        <label className="ef-label">Category
-          <select className="ef-input" value={form.category}
+        <label htmlFor="ef-category" className="ef-label">Category
+          <select id="ef-category" className="ef-input" value={form.category}
             onChange={(e) => set("category", e.target.value)}>
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
       </div>
       <div className="ef-row">
-        <label className="ef-label ef-desc">Description
-          <input className="ef-input" type="text" placeholder="e.g. Salary Credit"
+        <label htmlFor="ef-desc" className="ef-label ef-desc">Description
+          <input id="ef-desc" className="ef-input" type="text" placeholder="e.g. Salary Credit"
             value={form.description}
             onChange={(e) => set("description", e.target.value)} required />
         </label>
-        <label className="ef-label">Amount (₹)
-          <input className="ef-input" type="number" min="0.01" step="0.01"
+        <label htmlFor="ef-amount" className="ef-label">Amount (₹)
+          <input id="ef-amount" className="ef-input" type="number" min="0.01" step="0.01"
             placeholder="0.00"
             value={form.amount || ""}
             onChange={(e) => set("amount", parseFloat(e.target.value) || 0)} required />
@@ -346,7 +349,7 @@ export default function Dashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.name.match(/\.csv$/i)) { setCsvError("Please upload a .csv file."); return; }
-    if (file.size > 5 * 1024 * 1024) { setCsvError("File size must be under 5 MB."); return; }
+    if (file.size > MAX_FILE_SIZE_BYTES) { setCsvError("File size must be under 5 MB."); return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = String(ev.target?.result ?? "");
@@ -481,10 +484,10 @@ export default function Dashboard() {
           <p className="page-sub">{entries.length} entries · {new Date().toLocaleString("en-IN", { month: "long", year: "numeric" })}</p>
         </div>
         <div className="header-actions">
-          <label className="btn-import" title="Import CSV">
+          <label htmlFor="csv-import" className="btn-import" title="Import CSV">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Import CSV
-            <input ref={csvRef} type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
+            <input ref={csvRef} id="csv-import" type="file" accept=".csv" className="hidden" aria-label="Import CSV file" onChange={handleCsvUpload} />
           </label>
           <button className="btn-add" onClick={() => { setShowForm(true); setEditEntry(null); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -613,14 +616,14 @@ export default function Dashboard() {
                   </td>
                   <td className="right"><span className={`badge ${e.type}`}>{e.type}</span></td>
                   <td className="right">
-                    <button className="act-btn edit" title="Edit" onClick={() => { setEditEntry(e); setShowForm(false); }}>✏️</button>
+                    <button className="act-btn edit" title="Edit" aria-label="Edit entry" onClick={() => { setEditEntry(e); setShowForm(false); }}>✏️</button>
                     {deleteConfirm === e.id ? (
                       <>
                         <button className="act-btn confirm-del" onClick={() => deleteEntry(e.id)}>Confirm</button>
                         <button className="act-btn cancel-del" onClick={() => setDeleteConfirm(null)}>Cancel</button>
                       </>
                     ) : (
-                      <button className="act-btn del" title="Delete" onClick={() => setDeleteConfirm(e.id)}>🗑️</button>
+                      <button className="act-btn del" title="Delete" aria-label="Delete entry" onClick={() => setDeleteConfirm(e.id)}>🗑️</button>
                     )}
                   </td>
                 </tr>
