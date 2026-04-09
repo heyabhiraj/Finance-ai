@@ -14,7 +14,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ error: "Gemini API key is not configured." }),
+      JSON.stringify({ error: "Internal server error." }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }

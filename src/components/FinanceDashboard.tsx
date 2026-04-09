@@ -18,7 +18,7 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
-import * as XLSX from "xlsx";
+import readXlsxFile, { type Row } from "read-excel-file/browser";
 import { BUDGETS } from "../config/budgets";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -49,62 +49,135 @@ const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 // ── Helper Functions ───────────────────────────────────────────────────────────
 
-function parseTransactionsFromSheet(
-  workbook: XLSX.WorkBook
-): Transaction[] {
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, {
-    defval: "",
+/** Format a Date (or date-like value) to YYYY-MM-DD. */
+function formatDate(value: Row[number]): string {
+  if (value instanceof Date) {
+    return value.toISOString().split("T")[0];
+  }
+  return String(value ?? "").trim();
+}
+
+/** Map header names (case-insensitive) to their column index. */
+function buildHeaderMap(headers: Row): Record<string, number> {
+  const map: Record<string, number> = {};
+  headers.forEach((cell, i) => {
+    if (cell !== null) {
+      map[String(cell).trim().toLowerCase()] = i;
+    }
   });
+  return map;
+}
 
-  return rows
-    .map((row) => {
-      // Case-insensitive header matching
-      const get = (keys: string[]): unknown => {
-        const found = Object.keys(row).find((k) =>
-          keys.some((key) => k.trim().toLowerCase() === key.toLowerCase())
-        );
-        return found ? row[found] : "";
-      };
+/** Return the first matching column index, or -1. */
+function findCol(map: Record<string, number>, keys: string[]): number {
+  for (const key of keys) {
+    if (map[key.toLowerCase()] !== undefined) return map[key.toLowerCase()];
+  }
+  return -1;
+}
 
-      const rawAmount = get(["amount", "amt", "debit", "credit"]);
-      const parsedAmount =
-        typeof rawAmount === "number"
-          ? rawAmount
-          : parseFloat(String(rawAmount).replace(/[^0-9.-]/g, ""));
+/** Parse an xlsx file using read-excel-file (no known CVEs). */
+async function parseXlsxFile(file: File): Promise<Transaction[]> {
+  const rows: Row[] = await readXlsxFile(file);
+  if (rows.length < 2) return [];
 
-      if (isNaN(parsedAmount) || parsedAmount === 0) {
-        return null; // skip rows with unparseable or zero amounts
-      }
-      const amount = Math.abs(parsedAmount);
+  const headerMap = buildHeaderMap(rows[0]);
 
-      const rawDate = get(["date", "transaction date", "txn date", "value date"]);
-      let dateStr = "";
-      if (rawDate instanceof Date) {
-        dateStr = rawDate.toISOString().split("T")[0];
-      } else if (typeof rawDate === "number") {
-        const d = XLSX.SSF.parse_date_code(rawDate);
-        dateStr = d
-          ? `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`
-          : String(rawDate);
+  const dateIdx = findCol(headerMap, ["date", "transaction date", "txn date", "value date"]);
+  const descIdx = findCol(headerMap, ["description", "narration", "details", "particulars", "memo"]);
+  const amountIdx = findCol(headerMap, ["amount", "amt", "debit", "credit"]);
+  const categoryIdx = findCol(headerMap, ["category", "type", "tag"]);
+
+  const results: Transaction[] = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+
+    const rawAmount = amountIdx >= 0 ? row[amountIdx] : null;
+    const parsedAmount =
+      typeof rawAmount === "number"
+        ? rawAmount
+        : parseFloat(String(rawAmount ?? "").replace(/[^0-9.-]/g, ""));
+
+    if (isNaN(parsedAmount) || parsedAmount === 0) continue;
+
+    const date = dateIdx >= 0 ? formatDate(row[dateIdx]) : "";
+    const description = descIdx >= 0 ? String(row[descIdx] ?? "Unknown").trim() : "Unknown";
+    const rawCategory = categoryIdx >= 0 ? String(row[categoryIdx] ?? "").trim() : "";
+    const category = rawCategory || inferCategory(description);
+
+    results.push({ date, description, amount: Math.abs(parsedAmount), category });
+  }
+
+  return results;
+}
+
+/** Parse a plain-text CSV file without any third-party dependency. */
+/** RFC 4180-compliant CSV row parser: handles quoted fields with embedded commas and escaped quotes. */
+function parseCsvRow(line: string): string[] {
+  const fields: string[] = [];
+  let cur = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') {
+        cur += '"';
+        i++; // skip escaped quote
+      } else if (ch === '"') {
+        inQuotes = false;
       } else {
-        dateStr = String(rawDate);
+        cur += ch;
       }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        fields.push(cur.trim());
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+  }
+  fields.push(cur.trim());
+  return fields;
+}
 
-      const description = String(
-        get(["description", "narration", "details", "particulars", "memo"]) ||
-          "Unknown"
-      ).trim();
+/** Parse a plain-text CSV file without any third-party dependency. */
+function parseCsvContent(text: string): Transaction[] {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
 
-      const rawCategory = String(
-        get(["category", "type", "tag"]) || ""
-      ).trim();
+  const headers = parseCsvRow(lines[0]);
+  const headerMap: Record<string, number> = {};
+  headers.forEach((h, i) => { headerMap[h.toLowerCase()] = i; });
 
-      const category = rawCategory || inferCategory(description);
+  const dateIdx = findCol(headerMap, ["date", "transaction date", "txn date", "value date"]);
+  const descIdx = findCol(headerMap, ["description", "narration", "details", "particulars", "memo"]);
+  const amountIdx = findCol(headerMap, ["amount", "amt", "debit", "credit"]);
+  const categoryIdx = findCol(headerMap, ["category", "type", "tag"]);
 
-      return { date: dateStr, description, amount, category };
-    })
-    .filter((t): t is Transaction => t !== null);
+  const results: Transaction[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const cols = parseCsvRow(lines[i]);
+
+    const rawAmount = amountIdx >= 0 ? cols[amountIdx] : "";
+    const parsedAmount = parseFloat(rawAmount.replace(/[^0-9.-]/g, ""));
+    if (isNaN(parsedAmount) || parsedAmount === 0) continue;
+
+    const date = dateIdx >= 0 ? (cols[dateIdx] ?? "") : "";
+    const description = descIdx >= 0 ? (cols[descIdx] ?? "Unknown").trim() : "Unknown";
+    const rawCategory = categoryIdx >= 0 ? (cols[categoryIdx] ?? "").trim() : "";
+    const category = rawCategory || inferCategory(description);
+
+    results.push({ date, description, amount: Math.abs(parsedAmount), category });
+  }
+
+  return results;
 }
 
 function inferCategory(description: string): string {
@@ -188,8 +261,8 @@ export default function FinanceDashboard() {
     setInsights([]);
     setInsightError("");
 
-    if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
-      setParseError("Please upload a valid .xlsx, .xls, or .csv file.");
+    if (!file.name.match(/\.(xlsx|csv)$/i)) {
+      setParseError("Please upload a valid .xlsx or .csv file.");
       return;
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -197,28 +270,38 @@ export default function FinanceDashboard() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, {
-          type: "binary",
-          cellFormula: false, // mitigate formula-injection risks
-          cellHTML: false,
-        });
-        const parsed = parseTransactionsFromSheet(workbook);
-        if (parsed.length === 0) {
-          setParseError(
-            "No valid transactions found. Ensure your file has Date, Description, Amount, and Category columns."
-          );
-          return;
+    if (file.name.match(/\.csv$/i)) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = parseCsvContent(String(e.target?.result ?? ""));
+          if (parsed.length === 0) {
+            setParseError(
+              "No valid transactions found. Ensure your file has Date, Description, Amount, and Category columns."
+            );
+            return;
+          }
+          setTransactions(parsed);
+        } catch {
+          setParseError("Failed to parse CSV file.");
         }
-        setTransactions(parsed);
-      } catch {
-        setParseError("Failed to parse file. Ensure it is a valid spreadsheet.");
-      }
-    };
-    reader.readAsBinaryString(file);
+      };
+      reader.readAsText(file);
+    } else {
+      parseXlsxFile(file)
+        .then((parsed) => {
+          if (parsed.length === 0) {
+            setParseError(
+              "No valid transactions found. Ensure your file has Date, Description, Amount, and Category columns."
+            );
+            return;
+          }
+          setTransactions(parsed);
+        })
+        .catch(() => {
+          setParseError("Failed to parse file. Ensure it is a valid .xlsx spreadsheet.");
+        });
+    }
   }, []);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -293,13 +376,13 @@ export default function FinanceDashboard() {
           >
             <Upload className="mx-auto w-10 h-10 text-indigo-400 mb-3" />
             <p className="text-gray-600 font-medium">
-              Drag &amp; drop your .xlsx / .csv statement here
+              Drag &amp; drop your .xlsx or .csv statement here
             </p>
             <p className="text-sm text-gray-400 mt-1">or click to browse (max 5 MB)</p>
             <input
               id="file-input"
               type="file"
-              accept=".xlsx,.xls,.csv"
+              accept=".xlsx,.csv"
               className="hidden"
               onChange={handleFileInput}
             />
