@@ -2,21 +2,21 @@
 import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import FinanceDashboard from '../components/FinanceDashboard';
+import BudgetOptimizer from '../components/BudgetOptimizer';
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
     <BaseHead
-      title="Personal Finance Assistant"
-      description="Track your spending, visualise budgets, and get AI-powered financial insights."
+      title="Smart Finance Optimizer"
+      description="OR-powered savings planner with AI financial strategist. Upload your statement, set a savings goal, and get data-driven recommendations."
     />
   </head>
   <body>
     <Header />
     <main>
-      <FinanceDashboard client:load />
+      <BudgetOptimizer client:load />
     </main>
     <Footer />
   </body>
