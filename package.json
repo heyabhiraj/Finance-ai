@@ -23,10 +23,10 @@
 		"lucide-react": "^1.8.0",
 		"react": "^19.2.5",
 		"react-dom": "^19.2.5",
+		"read-excel-file": "^8.0.3",
 		"recharts": "^3.8.1",
 		"tailwindcss": "^3.4.19",
-		"typescript": "5.9.3",
-		"xlsx": "^0.18.5"
+		"typescript": "5.9.3"
 	},
 	"devDependencies": {
 		"@types/react": "^19.2.14",
