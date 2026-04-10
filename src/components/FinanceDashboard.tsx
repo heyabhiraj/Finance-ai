@@ -354,7 +354,7 @@ export default function FinanceDashboard() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-3">
         <Wallet className="text-indigo-600 w-6 h-6" />
-        <h1 className="text-xl font-bold text-gray-800">Personal Finance Assistant</h1>
+        <h1 className="text-xl font-bold text-gray-800">Pinance Ai – AI Insights</h1>
       </header>
 
       <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
